@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency Converter</title>
+    <style>
+        /* Reset and base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Main container */
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        /* Header */
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        /* Form group styling */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Input and select styling */
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            background: white;
+        }
+
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* Convert button */
+        .convert-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        .convert-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .convert-btn:active {
+            transform: translateY(0);
+        }
+
+        .convert-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Result section */
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: center;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .result-text {
+            font-size: 24px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .result-text.error {
+            color: #e74c3c;
+            font-size: 16px;
+        }
+
+        .result-text.loading {
+            color: #667eea;
+            font-size: 16px;
+        }
+
+        /* Error message styling */
+        .error-message {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* Responsive design */
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .result-text {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💱 Currency Converter</h1>
+        
+        <form id="converterForm">
+            <!-- Base Currency Selection -->
+            <div class="form-group">
+                <label for="baseCurrency">From Currency</label>
+                <select id="baseCurrency" required>
+                    <option value="">Select currency...</option>
+                </select>
+                <span class="error-message" id="baseCurrencyError"></span>
+            </div>
+
+            <!-- Target Currency Selection -->
+            <div class="form-group">
+                <label for="targetCurrency">To Currency</label>
+                <select id="targetCurrency" required>
+                    <option value="">Select currency...</option>
+                </select>
+                <span class="error-message" id="targetCurrencyError"></span>
+            </div>
+
+            <!-- Amount Input -->
+            <div class="form-group">
+                <label for="amount">Amount</label>
+                <input 
+                    type="number" 
+                    id="amount" 
+                    placeholder="Enter amount" 
+                    min="0" 
+                    step="0.01" 
+                    required
+                >
+                <span class="error-message" id="amountError"></span>
+            </div>
+
+            <!-- Convert Button -->
+            <button type="submit" class="convert-btn" id="convertBtn">
+                Convert
+            </button>
+        </form>
+
+        <!-- Result Display -->
+        <div class="result">
+            <div class="result-text" id="resultText">
+                Enter amount and select currencies to convert
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // CURRENCY CONVERTER APPLICATION
+        // ============================================
+
+        // Backend API endpoint - calls our secure backend server
+        // The backend handles the API key securely
+        const API_BASE_URL = 'http://localhost:3000/api/rates/';
+
+        // Complete list of all 195 countries' currencies
+        // Sorted alphabetically by country name for easy navigation
+        const currencies = [
+            { code: 'AFN', name: 'Afghan Afghani (Afghanistan)' },
+            { code: 'ALL', name: 'Albanian Lek (Albania)' },
+            { code: 'DZD', name: 'Algerian Dinar (Algeria)' },
+            { code: 'USD', name: 'US Dollar (American Samoa)' },
+            { code: 'EUR', name: 'Euro (Andorra)' },
+            { code: 'AOA', name: 'Angolan Kwanza (Angola)' },
+            { code: 'XCD', name: 'East Caribbean Dollar (Antigua and Barbuda)' },
+            { code: 'ARS', name: 'Argentine Peso (Argentina)' },
+            { code: 'AMD', name: 'Armenian Dram (Armenia)' },
+            { code: 'AWG', name: 'Aruban Florin (Aruba)' },
+            { code: 'AUD', name: 'Australian Dollar (Australia)' },
+            { code: 'EUR', name: 'Euro (Austria)' },
+            { code: 'AZN', name: 'Azerbaijani Manat (Azerbaijan)' },
+            { code: 'BSD', name: 'Bahamian Dollar (Bahamas)' },
+            { code: 'BHD', name: 'Bahraini Dinar (Bahrain)' },
+            { code: 'BDT', name: 'Bangladeshi Taka (Bangladesh)' },
+            { code: 'BBD', name: 'Barbadian Dollar (Barbados)' },
+            { code: 'BYN', name: 'Belarusian Ruble (Belarus)' },
+            { code: 'EUR', name: 'Euro (Belgium)' },
+            { code: 'BZD', name: 'Belize Dollar (Belize)' },
+            { code: 'XOF', name: 'CFA Franc BCEAO (Benin)' },
+            { code: 'BMD', name: 'Bermudian Dollar (Bermuda)' },
+            { code: 'BTN', name: 'Bhutanese Ngultrum (Bhutan)' },
+            { code: 'BOB', name: 'Bolivian Boliviano (Bolivia)' },
+            { code: 'USD', name: 'US Dollar (Bonaire)' },
+            { code: 'BAM', name: 'Bosnia-Herzegovina Convertible Mark (Bosnia and Herzegovina)' },
+            { code: 'BWP', name: 'Botswanan Pula (Botswana)' },
+            { code: 'BRL', name: 'Brazilian Real (Brazil)' },
+            { code: 'USD', name: 'US Dollar (British Indian Ocean Territory)' },
+            { code: 'BND', name: 'Brunei Dollar (Brunei)' },
+            { code: 'BGN', name: 'Bulgarian Lev (Bulgaria)' },
+            { code: 'XOF', name: 'CFA Franc BCEAO (Burkina Faso)' },
+            { code: 'BIF', name: 'Burundian Franc (Burundi)' },
+            { code: 'KHR', name: 'Cambodian Riel (Cambodia)' },
+            { code: 'XAF', name: 'CFA Franc BEAC (Cameroon)' },
+            { code: 'CAD', name: 'Canadian Dollar (Canada)' },
+            { code: 'CVE', name: 'Cape Verdean Escudo (Cape Verde)' },
+            { code: 'XAF', name: 'CFA Franc BEAC (Central African Republic)' },
+            { code: 'XAF', name: 'CFA Franc BEAC (Chad)' },
+            { code: 'CLP', name: 'Chilean Peso (Chile)' },
+            { code: 'CNY', name: 'Chinese Yuan (China)' },
+            { code: 'AUD', name: 'Australian Dollar (Christmas Island)' },
+            { code: 'AUD', name: 'Australian Dollar (Cocos Islands)' },
+            { code: 'COP', name: 'Colombian Peso (Colombia)' },
+            { code: 'KMF', name: 'Comorian Franc (Comoros)' },
+            { code: 'XAF', name: 'CFA Franc BEAC (Congo)' },
+            { code: 'NZD', name: 'New Zealand Dollar (Cook Islands)' },
+            { code: 'CRC', name: 'Costa Rican Colón (Costa Rica)' },
+            { code: 'XOF', name: 'CFA Franc BCEAO (Ivory Coast)' },
+            { code: 'HRK', name: 'Croatian Kuna (Croatia)' },
+            { code: 'CUP', name: 'Cuban Peso (Cuba)' },
+            { code: 'ANG', name: 'Netherlands Antillean Guilder (Curaçao)' },
+            { code: 'EUR', name: 'Euro (Cyprus)' },
+            { code: 'CZK', name: 'Czech Koruna (Czech Republic)' },
+            { code: 'DKK', name: 'Danish Krone (Denmark)' },
+            { code: 'DJF', name: 'Djiboutian Franc (Djibouti)' },
+            { code: 'XCD', name: 'East Caribbean Dollar (Dominica)' },
+            { code: 'DOP', name: 'Dominican Peso (Dominican Republic)' },
+            { code: 'USD', name: 'US Dollar (Ecuador)' },
+            { code: 'EGP', name: 'Egyptian Pound (Egypt)' },
+            { code: 'USD', name: 'US Dollar (El Salvador)' },
+            { code: 'XAF', name: 'CFA Franc BEAC (Equatorial Guinea)' },
+            { code: 'ERN', name: 'Eritrean Nakfa (Eritrea)' },
+            { code: 'EUR', name: 'Euro (Estonia)' },
+            { code: 'SZL', name: 'Swazi Lilangeni (Eswatini)' },
+            { code: 'ETB', name: 'Ethiopian Birr (Ethiopia)' },
+            { code: 'FKP', name: 'Falkland Islands Pound (Falkland Islands)' },
+            { code: 'DKK', name: 'Danish Krone (Faroe Islands)' },
+            { code: 'FJD', name: 'Fijian Dollar (Fiji)' },
+            { code: 'EUR', name: 'Euro (Finland)' },
+            { code: 'EUR', name: 'Euro (France)' },
+            { code: 'EUR', name: 'Euro (French Guiana)' },
+            { code: 'XPF', name: 'CFP Franc (French Polynesia)' },
+            { code: 'EUR', name: 'Euro (French Southern Territories)' },
+            { code: 'XAF', name: 'CFA Franc BEAC (Gabon)' },
+            { code: 'GMD', name: 'Gambian Dalasi (Gambia)' },
+            { code: 'GEL', name: 'Georgian Lari (Georgia)' },
+            { code: 'EUR', name: 'Euro (Germany)' },
+            { code: 'GHS', name: 'Ghanaian Cedi (Ghana)' },
+            { code: 'GIP', name: 'Gibraltar Pound (Gibraltar)' },
+            { code: 'EUR', name: 'Euro (Greece)' },
+            { code: 'DKK', name: 'Danish Krone (Greenland)' },
+            { code: 'XCD', name: 'East Caribbean Dollar (Grenada)' },
+            { code: 'EUR', name: 'Euro (Guadeloupe)' },
+            { code: 'USD', name: 'US Dollar (Guam)' },
+            { code: 'GTQ', name: 'Guatemalan Quetzal (Guatemala)' },
+            { code: 'GBP', name: 'British Pound (Guernsey)' },
+            { code: 'GNF', name: 'Guinean Franc (Guinea)' },
+            { code: 'XOF', name: 'CFA Franc BCEAO (Guinea-Bissau)' },
+            { code: 'GYD', name: 'Guyanaese Dollar (Guyana)' },
+            { code: 'HTG', name: 'Haitian Gourde (Haiti)' },
+            { code: 'AUD', name: 'Australian Dollar (Heard Island and McDonald Islands)' },
+            { code: 'EUR', name: 'Euro (Holy See)' },
+            { code: 'HNL', name: 'Honduran Lempira (Honduras)' },
+            { code: 'HKD', name: 'Hong Kong Dollar (Hong Kong)' },
+            { code: 'HUF', name: 'Hungarian Forint (Hungary)' },
+            { code: 'ISK', name: 'Icelandic Króna (Iceland)' },
+            { code: 'INR', name: 'Indian Rupee (India)' },
+            { code: 'IDR', name: 'Indonesian Rupiah (Indonesia)' },
+            { code: 'IRR', name: 'Iranian Rial (Iran)' },
+            { code: 'IQD', name: 'Iraqi Dinar (Iraq)' },
+            { code: 'EUR', name: 'Euro (Ireland)' },
+            { code: 'GBP', name: 'British Pound (Isle of Man)' },
+            { code: 'ILS', name: 'Israeli New Sheqel (Israel)' },
+            { code: 'EUR', name: 'Euro (Italy)' },
+            { code: 'JMD', name: 'Jamaican Dollar (Jamaica)' },
+            { code: 'JPY', name: 'Japanese Yen (Japan)' },
+            { code: 'GBP', name: 'British Pound (Jersey)' },
+            { code: 'JOD', name: 'Jordanian Dinar (Jordan)' },
+            { code: 'KZT', name: 'Kazakhstani Tenge (Kazakhstan)' },
+            { code: 'KES', name: 'Kenyan Shilling (Kenya)' },
+            { code: 'AUD', name: 'Australian Dollar (Kiribati)' },
+            { code: 'KPW', name: 'North Korean Won (North Korea)' },
+            { code: 'KRW', name: 'South Korean Won (South Korea)' },
+            { code: 'KWD', name: 'Kuwaiti Dinar (Kuwait)' },
+            { code: 'KGS', name: 'Kyrgystani Som (Kyrgyzstan)' },
+            { code: 'LAK', name: 'Laotian Kip (Laos)' },
+            { code: 'EUR', name: 'Euro (Latvia)' },
+            { code: 'LBP', name: 'Lebanese Pound (Lebanon)' },
+            { code: 'LSL', name: 'Lesotho Loti (Lesotho)' },
+            { code: 'LRD', name: 'Liberian Dollar (Liberia)' },
+            { code: 'LYD', name: 'Libyan Dinar (Libya)' },
+            { code: 'CHF', name: 'Swiss Franc (Liechtenstein)' },
+            { code: 'EUR', name: 'Euro (Lithuania)' },
+            { code: 'EUR', name: 'Euro (Luxembourg)' },
+            { code: 'MOP', name: 'Macanese Pataca (Macau)' },
+            { code: 'MKD', name: 'Macedonian Denar (North Macedonia)' },
+            { code: 'MGA', name: 'Malagasy Ariary (Madagascar)' },
+            { code: 'MWK', name: 'Malawian Kwacha (Malawi)' },
+            { code: 'MYR', name: 'Malaysian Ringgit (Malaysia)' },
+            { code: 'MVR', name: 'Maldivian Rufiyaa (Maldives)' },
+            { code: 'XOF', name: 'CFA Franc BCEAO (Mali)' },
+            { code: 'EUR', name: 'Euro (Malta)' },
+            { code: 'USD', name: 'US Dollar (Marshall Islands)' },
+            { code: 'EUR', name: 'Euro (Martinique)' },
+            { code: 'MRU', name: 'Mauritanian Ouguiya (Mauritania)' },
+            { code: 'MUR', name: 'Mauritian Rupee (Mauritius)' },
+            { code: 'EUR', name: 'Euro (Mayotte)' },
+            { code: 'MXN', name: 'Mexican Peso (Mexico)' },
+            { code: 'USD', name: 'US Dollar (Micronesia)' },
+            { code: 'MDL', name: 'Moldovan Leu (Moldova)' },
+            { code: 'EUR', name: 'Euro (Monaco)' },
+            { code: 'MNT', name: 'Mongolian Tugrik (Mongolia)' },
+            { code: 'EUR', name: 'Euro (Montenegro)' },
+            { code: 'XCD', name: 'East Caribbean Dollar (Montserrat)' },
+            { code: 'MAD', name: 'Moroccan Dirham (Morocco)' },
+            { code: 'MZN', name: 'Mozambican Metical (Mozambique)' },
+            { code: 'MMK', name: 'Myanma Kyat (Myanmar)' },
+            { code: 'NAD', name: 'Namibian Dollar (Namibia)' },
+            { code: 'AUD', name: 'Australian Dollar (Nauru)' },
+            { code: 'NPR', name: 'Nepalese Rupee (Nepal)' },
+            { code: 'EUR', name: 'Euro (Netherlands)' },
+            { code: 'XPF', name: 'CFP Franc (New Caledonia)' },
+            { code: 'NZD', name: 'New Zealand Dollar (New Zealand)' },
+            { code: 'NIO', name: 'Nicaraguan Córdoba (Nicaragua)' },
+            { code: 'XOF', name: 'CFA Franc BCEAO (Niger)' },
+            { code: 'NGN', name: 'Nigerian Naira (Nigeria)' },
+            { code: 'NZD', name: 'New Zealand Dollar (Niue)' },
+            { code: 'AUD', name: 'Australian Dollar (Norfolk Island)' },
+            { code: 'USD', name: 'US Dollar (Northern Mariana Islands)' },
+            { code: 'NOK', name: 'Norwegian Krone (Norway)' },
+            { code: 'OMR', name: 'Omani Rial (Oman)' },
+            { code: 'PKR', name: 'Pakistani Rupee (Pakistan)' },
+            { code: 'USD', name: 'US Dollar (Palau)' },
+            { code: 'ILS', name: 'Israeli New Sheqel (Palestine)' },
+            { code: 'PAB', name: 'Panamanian Balboa (Panama)' },
+            { code: 'PGK', name: 'Papua New Guinean Kina (Papua New Guinea)' },
+            { code: 'PYG', name: 'Paraguayan Guarani (Paraguay)' },
+            { code: 'PEN', name: 'Peruvian Nuevo Sol (Peru)' },
+            { code: 'PHP', name: 'Philippine Peso (Philippines)' },
+            { code: 'NZD', name: 'New Zealand Dollar (Pitcairn)' },
+            { code: 'PLN', name: 'Polish Zloty (Poland)' },
+            { code: 'EUR', name: 'Euro (Portugal)' },
+            { code: 'USD', name: 'US Dollar (Puerto Rico)' },
+            { code: 'QAR', name: 'Qatari Rial (Qatar)' },
+            { code: 'EUR', name: 'Euro (Réunion)' },
+            { code: 'RON', name: 'Romanian Leu (Romania)' },
+            { code: 'RUB', name: 'Russian Ruble (Russia)' },
+            { code: 'RWF', name: 'Rwandan Franc (Rwanda)' },
+            { code: 'EUR', name: 'Euro (Saint Barthélemy)' },
+            { code: 'SHP', name: 'Saint Helena Pound (Saint Helena)' },
+            { code: 'XCD', name: 'East Caribbean Dollar (Saint Kitts and Nevis)' },
+            { code: 'XCD', name: 'East Caribbean Dollar (Saint Lucia)' },
+            { code: 'EUR', name: 'Euro (Saint Martin)' },
+            { code: 'EUR', name: 'Euro (Saint Pierre and Miquelon)' },
+            { code: 'XCD', name: 'East Caribbean Dollar (Saint Vincent and the Grenadines)' },
+            { code: 'WST', name: 'Samoan Tala (Samoa)' },
+            { code: 'EUR', name: 'Euro (San Marino)' },
+            { code: 'STN', name: 'São Tomé and Príncipe Dobra (São Tomé and Príncipe)' },
+            { code: 'SAR', name: 'Saudi Riyal (Saudi Arabia)' },
+            { code: 'XOF', name: 'CFA Franc BCEAO (Senegal)' },
+            { code: 'RSD', name: 'Serbian Dinar (Serbia)' },
+            { code: 'SCR', name: 'Seychellois Rupee (Seychelles)' },
+            { code: 'SLE', name: 'Sierra Leonean Leone (Sierra Leone)' },
+            { code: 'SGD', name: 'Singapore Dollar (Singapore)' },
+            { code: 'ANG', name: 'Netherlands Antillean Guilder (Sint Maarten)' },
+            { code: 'EUR', name: 'Euro (Slovakia)' },
+            { code: 'EUR', name: 'Euro (Slovenia)' },
+            { code: 'SBD', name: 'Solomon Islands Dollar (Solomon Islands)' },
+            { code: 'SOS', name: 'Somali Shilling (Somalia)' },
+            { code: 'ZAR', name: 'South African Rand (South Africa)' },
+            { code: 'GBP', name: 'British Pound (South Georgia and the South Sandwich Islands)' },
+            { code: 'SSP', name: 'South Sudanese Pound (South Sudan)' },
+            { code: 'EUR', name: 'Euro (Spain)' },
+            { code: 'LKR', name: 'Sri Lankan Rupee (Sri Lanka)' },
+            { code: 'SDG', name: 'Sudanese Pound (Sudan)' },
+            { code: 'SRD', name: 'Surinamese Dollar (Suriname)' },
+            { code: 'NOK', name: 'Norwegian Krone (Svalbard and Jan Mayen)' },
+            { code: 'SEK', name: 'Swedish Krona (Sweden)' },
+            { code: 'CHF', name: 'Swiss Franc (Switzerland)' },
+            { code: 'SYP', name: 'Syrian Pound (Syria)' },
+            { code: 'TWD', name: 'New Taiwan Dollar (Taiwan)' },
+            { code: 'TJS', name: 'Tajikistani Somoni (Tajikistan)' },
+            { code: 'TZS', name: 'Tanzanian Shilling (Tanzania)' },
+            { code: 'THB', name: 'Thai Baht (Thailand)' },
+            { code: 'USD', name: 'US Dollar (Timor-Leste)' },
+            { code: 'XOF', name: 'CFA Franc BCEAO (Togo)' },
+            { code: 'NZD', name: 'New Zealand Dollar (Tokelau)' },
+            { code: 'TOP', name: 'Tongan Pa\'anga (Tonga)' },
+            { code: 'TTD', name: 'Trinidad and Tobago Dollar (Trinidad and Tobago)' },
+            { code: 'TND', name: 'Tunisian Dinar (Tunisia)' },
+            { code: 'TRY', name: 'Turkish Lira (Turkey)' },
+            { code: 'TMT', name: 'Turkmenistani Manat (Turkmenistan)' },
+            { code: 'USD', name: 'US Dollar (Turks and Caicos Islands)' },
+            { code: 'AUD', name: 'Australian Dollar (Tuvalu)' },
+            { code: 'UGX', name: 'Ugandan Shilling (Uganda)' },
+            { code: 'UAH', name: 'Ukrainian Hryvnia (Ukraine)' },
+            { code: 'AED', name: 'UAE Dirham (United Arab Emirates)' },
+            { code: 'GBP', name: 'British Pound (United Kingdom)' },
+            { code: 'USD', name: 'US Dollar (United States)' },
+            { code: 'USD', name: 'US Dollar (United States Minor Outlying Islands)' },
+            { code: 'UYU', name: 'Uruguayan Peso (Uruguay)' },
+            { code: 'UZS', name: 'Uzbekistan Som (Uzbekistan)' },
+            { code: 'VUV', name: 'Vanuatu Vatu (Vanuatu)' },
+            { code: 'VES', name: 'Venezuelan Bolívar (Venezuela)' },
+            { code: 'VND', name: 'Vietnamese Dong (Vietnam)' },
+            { code: 'USD', name: 'US Dollar (Virgin Islands, British)' },
+            { code: 'USD', name: 'US Dollar (Virgin Islands, U.S.)' },
+            { code: 'XPF', name: 'CFP Franc (Wallis and Futuna)' },
+            { code: 'MAD', name: 'Moroccan Dirham (Western Sahara)' },
+            { code: 'YER', name: 'Yemeni Rial (Yemen)' },
+            { code: 'ZMW', name: 'Zambian Kwacha (Zambia)' },
+            { code: 'ZWL', name: 'Zimbabwean Dollar (Zimbabwe)' }
+        ];
+        
+        // Sort currencies alphabetically by country name for better UX
+        currencies.sort((a, b) => {
+            const countryA = a.name.split('(')[1]?.replace(')', '').trim() || '';
+            const countryB = b.name.split('(')[1]?.replace(')', '').trim() || '';
+            return countryA.localeCompare(countryB);
+        });
+
+        // Get DOM elements
+        const baseCurrencySelect = document.getElementById('baseCurrency');
+        const targetCurrencySelect = document.getElementById('targetCurrency');
+        const amountInput = document.getElementById('amount');
+        const convertBtn = document.getElementById('convertBtn');
+        const resultText = document.getElementById('resultText');
+        const converterForm = document.getElementById('converterForm');
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+
+        /**
+         * Populate currency dropdowns with available currencies
+         */
+        function populateCurrencyDropdowns() {
+            currencies.forEach(currency => {
+                // Create option element for base currency
+                const baseOption = document.createElement('option');
+                baseOption.value = currency.code;
+                baseOption.textContent = `${currency.code} - ${currency.name}`;
+                baseCurrencySelect.appendChild(baseOption);
+
+                // Create option element for target currency
+                const targetOption = document.createElement('option');
+                targetOption.value = currency.code;
+                targetOption.textContent = `${currency.code} - ${currency.name}`;
+                targetCurrencySelect.appendChild(targetOption);
+            });
+        }
+
+        // Initialize dropdowns when page loads
+        populateCurrencyDropdowns();
+
+        // ============================================
+        // ERROR HANDLING FUNCTIONS
+        // ============================================
+
+        /**
+         * Display error message for a specific field
+         * @param {string} fieldId - The ID of the field
+         * @param {string} message - Error message to display
+         */
+        function showError(fieldId, message) {
+            const errorElement = document.getElementById(fieldId + 'Error');
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.classList.add('show');
+            }
+        }
+
+        /**
+         * Clear error message for a specific field
+         * @param {string} fieldId - The ID of the field
+         */
+        function clearError(fieldId) {
+            const errorElement = document.getElementById(fieldId + 'Error');
+            if (errorElement) {
+                errorElement.textContent = '';
+                errorElement.classList.remove('show');
+            }
+        }
+
+        /**
+         * Clear all error messages
+         */
+        function clearAllErrors() {
+            clearError('baseCurrency');
+            clearError('targetCurrency');
+            clearError('amount');
+        }
+
+        /**
+         * Display result message
+         * @param {string} message - Message to display
+         * @param {string} type - Type of message: 'success', 'error', or 'loading'
+         */
+        function displayResult(message, type = 'success') {
+            resultText.textContent = message;
+            resultText.className = 'result-text';
+            
+            if (type === 'error') {
+                resultText.classList.add('error');
+            } else if (type === 'loading') {
+                resultText.classList.add('loading');
+            }
+        }
+
+        // ============================================
+        // VALIDATION FUNCTIONS
+        // ============================================
+
+        /**
+         * Validate the form inputs
+         * @returns {boolean} - True if valid, false otherwise
+         */
+        function validateForm() {
+            let isValid = true;
+            clearAllErrors();
+
+            // Validate base currency
+            const baseCurrency = baseCurrencySelect.value;
+            if (!baseCurrency) {
+                showError('baseCurrency', 'Please select a base currency');
+                isValid = false;
+            }
+
+            // Validate target currency
+            const targetCurrency = targetCurrencySelect.value;
+            if (!targetCurrency) {
+                showError('targetCurrency', 'Please select a target currency');
+                isValid = false;
+            }
+
+            // Check if base and target currencies are the same
+            if (baseCurrency && targetCurrency && baseCurrency === targetCurrency) {
+                showError('targetCurrency', 'Target currency must be different from base currency');
+                isValid = false;
+            }
+
+            // Validate amount
+            const amount = parseFloat(amountInput.value);
+            if (!amountInput.value || isNaN(amount) || amount <= 0) {
+                showError('amount', 'Please enter a valid positive number');
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        // ============================================
+        // API FUNCTIONS
+        // ============================================
+
+        /**
+         * Fetch exchange rates from the backend API
+         * The backend securely handles the API key
+         * @param {string} baseCurrency - Base currency code (e.g., 'USD')
+         * @returns {Promise<Object>} - Promise that resolves to exchange rates object
+         */
+        async function fetchExchangeRates(baseCurrency) {
+            try {
+                const response = await fetch(`${API_BASE_URL}${baseCurrency}`);
+                
+                // Check if the response is OK
+                if (!response.ok) {
+                    // Try to get error message from response
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `API Error: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                // Check if backend returned an error
+                if (!data.success) {
+                    throw new Error(data.error || 'Unknown API error');
+                }
+
+                // Check if rates exist
+                if (!data.rates) {
+                    throw new Error('Invalid response from API: rates not found');
+                }
+
+                return data.rates;
+            } catch (error) {
+                // Handle network errors or API failures
+                console.error('Error fetching exchange rates:', error);
+                
+                // Provide user-friendly error messages
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    throw new Error('Cannot connect to server. Make sure the backend server is running on port 3000.');
+                }
+                
+                throw new Error(`Failed to fetch exchange rates: ${error.message}`);
+            }
+        }
+
+        // ============================================
+        // CONVERSION FUNCTION
+        // ============================================
+
+        /**
+         * Convert currency using exchange rates
+         * @param {number} amount - Amount to convert
+         * @param {string} baseCurrency - Base currency code
+         * @param {string} targetCurrency - Target currency code
+         * @returns {Promise<number>} - Promise that resolves to converted amount
+         */
+        async function convertCurrency(amount, baseCurrency, targetCurrency) {
+            // Display loading message
+            displayResult('Fetching exchange rates...', 'loading');
+            convertBtn.disabled = true;
+
+            try {
+                // Fetch exchange rates
+                const rates = await fetchExchangeRates(baseCurrency);
+
+                // Check if target currency is supported
+                if (!rates[targetCurrency]) {
+                    throw new Error(`Currency code "${targetCurrency}" is not supported by the API`);
+                }
+
+                // Get the exchange rate for target currency
+                const exchangeRate = rates[targetCurrency];
+
+                // Calculate converted amount
+                const convertedAmount = amount * exchangeRate;
+
+                // Return the result
+                return {
+                    amount: amount,
+                    baseCurrency: baseCurrency,
+                    targetCurrency: targetCurrency,
+                    exchangeRate: exchangeRate,
+                    convertedAmount: convertedAmount
+                };
+            } catch (error) {
+                // Re-throw error to be handled by the form handler
+                throw error;
+            } finally {
+                // Re-enable the button
+                convertBtn.disabled = false;
+            }
+        }
+
+        // ============================================
+        // FORM HANDLER
+        // ============================================
+
+        /**
+         * Handle form submission
+         * @param {Event} event - Form submit event
+         */
+        async function handleFormSubmit(event) {
+            // Prevent default form submission
+            event.preventDefault();
+
+            // Validate form
+            if (!validateForm()) {
+                displayResult('Please fix the errors above', 'error');
+                return;
+            }
+
+            // Get form values
+            const amount = parseFloat(amountInput.value);
+            const baseCurrency = baseCurrencySelect.value;
+            const targetCurrency = targetCurrencySelect.value;
+
+            try {
+                // Convert currency
+                const result = await convertCurrency(amount, baseCurrency, targetCurrency);
+
+                // Format the result with proper number formatting
+                const formattedAmount = formatNumber(result.amount);
+                const formattedConverted = formatNumber(result.convertedAmount);
+
+                // Display the result
+                displayResult(
+                    `${formattedAmount} ${result.baseCurrency} = ${formattedConverted} ${result.targetCurrency}`,
+                    'success'
+                );
+            } catch (error) {
+                // Display error message
+                displayResult(`Error: ${error.message}`, 'error');
+                console.error('Conversion error:', error);
+            }
+        }
+
+        /**
+         * Format number with commas and appropriate decimal places
+         * @param {number} num - Number to format
+         * @returns {string} - Formatted number string
+         */
+        function formatNumber(num) {
+            // Format with up to 2 decimal places and add commas
+            return num.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+
+        // Handle form submission
+        converterForm.addEventListener('submit', handleFormSubmit);
+
+        // Clear errors when user starts typing/selecting
+        amountInput.addEventListener('input', () => clearError('amount'));
+        baseCurrencySelect.addEventListener('change', () => clearError('baseCurrency'));
+        targetCurrencySelect.addEventListener('change', () => clearError('targetCurrency'));
+    </script>
+</body>
+</html>
